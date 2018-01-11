@@ -17,7 +17,7 @@ namespace PrivacyABAC.WebAPI
                 .UseContentRoot(Directory.GetCurrentDirectory())
                 .UseIISIntegration()
                 .UseStartup<Startup>()
-                //.UseApplicationInsights()
+                .UseUrls("http://localhost:5050")
                 .Build();
 
             host.Run();

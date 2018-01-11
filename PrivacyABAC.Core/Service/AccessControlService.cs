@@ -40,20 +40,20 @@ namespace PrivacyABAC.Core.Service
             IEnumerable<string> afterObligationIds = null;
             IEnumerable<string> beforeObligationIds = null;
 
-            AccessControlEffect collectionEffect = AccessControlProcess(subject, resource, action, environment,ref permitPolicies, ref denyPolicies);
+            AccessControlEffect decision = AccessControlProcess(subject, resource, action, environment,ref permitPolicies, ref denyPolicies);
 
-            if (collectionEffect == AccessControlEffect.Permit)
+            if (decision == AccessControlEffect.Permit)
             {
                 afterObligationIds = permitPolicies.SelectMany(n => n.ObligationAfterIds);
                 beforeObligationIds = permitPolicies.SelectMany(n => n.ObligationBeforeIds);
             }
-            else if (collectionEffect == AccessControlEffect.Deny)
+            else if (decision == AccessControlEffect.Deny)
             {
                 afterObligationIds = denyPolicies.SelectMany(n => n.ObligationAfterIds);
                 beforeObligationIds = denyPolicies.SelectMany(n => n.ObligationBeforeIds);
             }
 
-            return new AccessControlResponseContext(collectionEffect, null, afterObligationIds, beforeObligationIds);
+            return new AccessControlResponseContext(decision, null, afterObligationIds, beforeObligationIds);
         }
 
         private AccessControlEffect CollectionAccessControlProcess(
@@ -64,7 +64,7 @@ namespace PrivacyABAC.Core.Service
             ref List<AccessControlPolicy> permitPolicies, 
             ref List<AccessControlPolicy> denyPolicies)
         {
-            AccessControlEffect result = AccessControlEffect.NotApplicable;
+            AccessControlEffect result = AccessControlEffect.Deny;
 
             ICollection<AccessControlPolicy> collectionPolicies = _accessControlPolicyRepository.Get(resource.Name, action, false);
 
@@ -85,23 +85,23 @@ namespace PrivacyABAC.Core.Service
                 foreach (var rule in policy.Rules)
                 {
                     bool isApplied = _expressionService.Evaluate(rule.Condition, subject.Data, null, environment.Data);
-                    if (isApplied && rule.Effect.Equals("Permit") && policy.RuleCombining.Equals("permit-overrides"))
+                    if (isApplied && rule.Effect.Equals("Permit") && policy.RuleCombining.Equals(AlgorithmCombining.PERMIT_OVERRIDES))
                     {
                         policyEffect = "Permit";
                         break;
                     }
-                    if (isApplied && rule.Effect.Equals("Deny") && policy.RuleCombining.Equals("deny-overrides"))
+                    if (isApplied && rule.Effect.Equals("Deny") && policy.RuleCombining.Equals(AlgorithmCombining.DENY_OVERRIDES))
                     {
                         policyEffect = "Deny";
                         break;
                     }
                 }
-                if (policyEffect.Equals("Permit") && policyCombining.Equals("permit-overrides"))
+                if (policyEffect.Equals("Permit") && policyCombining.Equals(AlgorithmCombining.PERMIT_OVERRIDES))
                 {
                     result = AccessControlEffect.Permit;
                     break;
                 }
-                else if (policyEffect.Equals("Deny") && policyCombining.Equals("deny-overrides"))
+                else if (policyEffect.Equals("Deny") && policyCombining.Equals(AlgorithmCombining.DENY_OVERRIDES))
                 {
                     result = AccessControlEffect.Deny;
                     break;
@@ -178,35 +178,35 @@ namespace PrivacyABAC.Core.Service
 
             foreach (var policy in targetPolicies)
             {
-                string policyEffect = String.Empty;
+                var policyEffect = AccessControlEffect.NotApplicable;
 
                 foreach (var rule in policy.Rules)
                 {
                     bool isApplied = _expressionService.Evaluate(rule.Condition, subject.Data, resourceData, environment.Data);
-                    if (isApplied && rule.Effect.Equals("Permit") && policy.RuleCombining.Equals("permit-overrides"))
+                    if (isApplied && rule.Effect.Equals(RuleEffect.PERMIT) && policy.RuleCombining.Equals(AlgorithmCombining.PERMIT_OVERRIDES))
                     {
-                        policyEffect = "Permit";
+                        policyEffect = AccessControlEffect.Permit;
                         break;
                     }
-                    if (isApplied && rule.Effect.Equals("Deny") && policy.RuleCombining.Equals("deny-overrides"))
+                    if (isApplied && rule.Effect.Equals(RuleEffect.DENY) && policy.RuleCombining.Equals(AlgorithmCombining.DENY_OVERRIDES))
                     {
-                        policyEffect = "Deny";
+                        policyEffect = AccessControlEffect.Deny;
                         break;
                     }
                 }
-                if (policyEffect.Equals("Permit"))
+                if (policyEffect == AccessControlEffect.Permit)
                 {
                     permitPolicies.Add(policy);
-                    if (policyCombining.Equals("permit-overrides"))
+                    if (policyCombining.Equals(AlgorithmCombining.PERMIT_OVERRIDES))
                     {
                         result = AccessControlEffect.Permit;
                         break;
                     }
                 }
-                else if (policyEffect.Equals("Deny"))
+                else if (policyEffect == AccessControlEffect.Deny)
                 {
                     denyPolicies.Add(policy);
-                    if (policyCombining.Equals("deny-overrides"))
+                    if (policyCombining.Equals(AlgorithmCombining.DENY_OVERRIDES))
                     {
                         result = AccessControlEffect.Deny;
                         break;
